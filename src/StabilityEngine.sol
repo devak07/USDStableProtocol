@@ -7,6 +7,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {CollateralToken} from "src/CollateralToken.sol";
 
+import {console} from "forge-std/Test.sol";
+
 /**
  * @title StabilityEngine
  * @author Andrzej Knapik (devak07)
@@ -25,6 +27,12 @@ import {CollateralToken} from "src/CollateralToken.sol";
  *         This scenario is unlikely but is still a known issue.
  *         A future update will introduce fees or commissions to address this issue in case it arises, though it remains
  *         a rare and improbable occurrence.
+ *
+ * @notice System currently has a limitation where it will not function properly if the price of the collateral
+ *         token falls below $10. This issue will be addressed in a future refactor.
+ *
+ * @notice System can't mint fractional tokens, so users can't redeem less than 1 token and can receive less than they
+ *         deposited up to the value of 1 token.
  */
 contract StabilityEngine is ReentrancyGuard {
     /////////////////////////////
@@ -66,6 +74,7 @@ contract StabilityEngine is ReentrancyGuard {
     CollateralToken private immutable i_collateralToken; // Collateral token instance.
 
     mapping(address userAddress => uint256 dollarsAmount) s_dollars; // Mapping to track each user's USD-equivalent collateral amount.
+    AggregatorV3Interface private immutable i_priceFeed;
 
     /////////////////////////////
     ////////// EVENTS ///////////
@@ -76,23 +85,18 @@ contract StabilityEngine is ReentrancyGuard {
      * @param userAddress The address of the user who deposited collateral.
      * @param amount The amount of collateral tokens transferred.
      */
-    event CollateralTransfered(address indexed userAddress, uint256 amount);
+    event CollateralDeposited(address indexed userAddress, uint256 amount);
+
+    /**
+     * @dev Event emitted when collateral tokens are redeemed by a user.
+     * @param userAddress The address of the user who redeemed collateral.
+     * @param amount The amount of collateral tokens redeemed.
+     */
+    event CollateralRedeemed(address indexed userAddress, uint256 amount);
 
     /////////////////////////////
     ///////// MODIFIERS /////////
     /////////////////////////////
-
-    /**
-     * @dev Modifier that checks if the provided address is valid (not the zero address).
-     * Reverts if the address is invalid.
-     * @param _address The address to check.
-     */
-    modifier isValidAddress(address _address) {
-        if (_address == address(0)) {
-            revert StabilityEngine__InvalidAddress();
-        }
-        _;
-    }
 
     /**
      * @dev Modifier that ensures the provided amount is greater than zero.
@@ -111,10 +115,12 @@ contract StabilityEngine is ReentrancyGuard {
     /////////////////////////////
 
     /**
-     * @dev Constructor for the StabilityEngine contract. Initializes the collateral token instance.
+     * @dev Constructor for the StabilityEngine contract. Initializes the collateral token instance and price feed.
+     * @param _priceFeed The address of the Chainlink price feed contract for the collateral token.
      */
-    constructor() {
+    constructor(address _priceFeed) {
         i_collateralToken = new CollateralToken(); // Deploys a new instance of the CollateralToken contract.
+        i_priceFeed = AggregatorV3Interface(_priceFeed);
     }
 
     /////////////////////////////
@@ -130,10 +136,10 @@ contract StabilityEngine is ReentrancyGuard {
      */
     function depositCollateral(uint256 _amountOfCollateralTokens)
         public
-        nonReentrant // Prevents reentrancy attacks.
-        moreThanZero(_amountOfCollateralTokens) // Ensures the deposit amount is greater than zero.
+        nonReentrant
+        moreThanZero(_amountOfCollateralTokens)
     {
-        _depositAndBurnCollateral(_amountOfCollateralTokens); // Internal function for handling deposit and burning process.
+        _depositAndBurnCollateral(_amountOfCollateralTokens);
     }
 
     /**
@@ -143,12 +149,8 @@ contract StabilityEngine is ReentrancyGuard {
      * regardless of the token price fluctuations.
      * @param _valueInDollars The amount of collateral in USD to redeem.
      */
-    function redeemCollateralAndBurnStability(uint256 _valueInDollars)
-        public
-        nonReentrant // Prevents reentrancy attacks.
-        moreThanZero(_valueInDollars) // Ensures the value to redeem is greater than zero.
-    {
-        _mintAndTransferCollateralToken(_valueInDollars); // Internal function for minting collateral tokens and transferring them to the user.
+    function redeemCollateral(uint256 _valueInDollars) public nonReentrant moreThanZero(_valueInDollars) {
+        _mintAndTransferCollateralToken(_valueInDollars);
     }
 
     //////////////////////////////
@@ -158,29 +160,31 @@ contract StabilityEngine is ReentrancyGuard {
     /**
      * @dev Internal function that handles minting collateral tokens and transferring them to the user.
      * It also adjusts the user's USD-equivalent balance based on the value of the redeemed collateral.
-     * This ensures that when a user redeems collateral, they always receive collateral equivalent to the specified USD value.
      * @param _valueInDollars The amount of collateral in USD to redeem.
      */
     function _mintAndTransferCollateralToken(uint256 _valueInDollars) internal {
-        uint256 amountToMint = _getAmountOfTokens(_valueInDollars); // Calculates the amount of collateral tokens to mint based on USD value.
-        i_collateralToken.mint(msg.sender, amountToMint); // Mints the calculated amount of collateral tokens to the user's address.
-        _changeValueInUsd(msg.sender, false, _valueInDollars); // Adjusts the user's USD balance.
+        if (s_dollars[msg.sender] < _valueInDollars) {
+            console.log("User balance: ", s_dollars[msg.sender]);
+            revert StabilityEngine__InfufficientBalance();
+        }
+        uint256 amountToMint = _getAmountOfTokens(_valueInDollars);
+        i_collateralToken.mint(msg.sender, amountToMint);
+        _changeValueInUsd(msg.sender, false, amountToMint);
+
+        emit CollateralRedeemed(msg.sender, amountToMint);
     }
 
     /**
      * @dev Internal function for depositing and burning collateral tokens.
      * The deposited collateral is burned and the user's balance is updated accordingly.
-     * This function ensures that the system maintains a 1:1 ratio between collateral value and USD value.
      * @param _amountOfCollateral The amount of collateral tokens to deposit and burn.
      */
     function _depositAndBurnCollateral(uint256 _amountOfCollateral) internal {
-        _transferFrom(msg.sender, address(this), address(i_collateralToken), _amountOfCollateral); // Transfers collateral tokens from the user to the contract.
+        _transferFrom(msg.sender, address(this), address(i_collateralToken), _amountOfCollateral);
+        i_collateralToken.burn(_amountOfCollateral);
+        _changeValueInUsd(msg.sender, true, _amountOfCollateral);
 
-        i_collateralToken.burn(_amountOfCollateral); // Burns the deposited collateral tokens to reduce the total supply.
-
-        _changeValueInUsd(msg.sender, true, _amountOfCollateral); // Updates the user's USD balance based on the collateral value.
-
-        emit CollateralTransfered(msg.sender, _amountOfCollateral); // Emits an event for the collateral transfer.
+        emit CollateralDeposited(msg.sender, _amountOfCollateral);
     }
 
     /**
@@ -194,52 +198,50 @@ contract StabilityEngine is ReentrancyGuard {
     function _transferFrom(address _from, address _to, address _tokenAddress, uint256 _amountToTransfer) internal {
         bool success = IERC20(_tokenAddress).transferFrom(_from, _to, _amountToTransfer);
         if (!success) {
-            revert StabilityEngine__TransferFailed(); // Reverts the transaction if the transfer fails.
+            revert StabilityEngine__TransferFailed();
         }
     }
 
     /**
      * @dev Internal function to update the user's USD balance when collateral tokens are deposited or redeemed.
-     * The system ensures that the balance reflects the exact value of collateral in USD, maintaining a 1:1 ratio.
      * @param _user The address of the user whose balance is being updated.
      * @param _action Indicates whether tokens are being deposited (true) or redeemed (false).
      * @param _amountOfCollateralTokens The amount of collateral tokens to use for the update.
      */
     function _changeValueInUsd(address _user, bool _action, uint256 _amountOfCollateralTokens) internal {
-        uint256 _amountInUsd = _getValueInUsd(_amountOfCollateralTokens); // Converts collateral value to USD.
+        uint256 _amountInUsd = _getValueInUsd(_amountOfCollateralTokens);
+        console.log("USD Amount ", _amountInUsd);
+        console.log(s_dollars[_user]);
 
         if (_action) {
-            s_dollars[_user] += _amountInUsd; // Increases the user's balance for deposits.
+            s_dollars[_user] += _amountInUsd;
         } else {
-            s_dollars[_user] -= _amountInUsd; // Decreases the user's balance for redemptions.
+            s_dollars[_user] -= _amountInUsd;
         }
     }
 
     /////////////////////////////
-    ////////// GETTERS //////////
+    // INTERNAL VIEW FUNCTIONS //
     /////////////////////////////
 
     /**
      * @dev Internal function that converts the collateral amount to its USD equivalent.
-     * The collateral's price is fetched from an oracle to get the current market price.
      * @param _amountOfCollateral The amount of collateral to convert to USD.
      * @return The USD equivalent of the collateral amount.
      */
     function _getValueInUsd(uint256 _amountOfCollateral) internal view returns (uint256) {
-        uint256 price = _getLastPriceOfCollateralTokenWithoutPrecision() * PRECISION_TO_ADD; // Gets the price of the collateral token from the oracle.
-
-        return ((price * _amountOfCollateral) / PRECISION); // Converts collateral amount to USD.
+        uint256 price = _getLastPriceOfCollateralTokenWithoutPrecision() * PRECISION_TO_ADD;
+        return ((price * _amountOfCollateral) / PRECISION);
     }
 
     /**
      * @dev Internal function to calculate how many tokens are needed to match a given USD value.
-     * This function uses the current collateral token price to determine the amount to mint or burn.
      * @param _valueInUsd The value in USD for which to calculate the required token amount.
      * @return The number of tokens needed to match the specified USD value.
      */
     function _getAmountOfTokens(uint256 _valueInUsd) internal view returns (uint256) {
-        uint256 priceWithPrecision = _getLastPriceOfCollateralTokenWithoutPrecision() * PRECISION_TO_ADD; // Get price with precision.
-        return ((_valueInUsd * PRECISION * PRECISION) / priceWithPrecision); // Calculates the token amount needed for the USD value.
+        uint256 priceWithPrecision = _getLastPriceOfCollateralTokenWithoutPrecision() * PRECISION_TO_ADD;
+        return ((_valueInUsd * PRECISION * PRECISION) / priceWithPrecision) / PRECISION;
     }
 
     /**
@@ -248,7 +250,46 @@ contract StabilityEngine is ReentrancyGuard {
      * @return The raw price of the collateral token.
      */
     function _getLastPriceOfCollateralTokenWithoutPrecision() internal view returns (uint256) {
-        (, int256 priceWithoutPrecision,,,) = AggregatorV3Interface(address(i_collateralToken)).latestRoundData();
-        return uint256(priceWithoutPrecision); // Returns the raw price from the oracle.
+        (, int256 priceWithoutPrecision,,,) = AggregatorV3Interface(i_priceFeed).latestRoundData();
+        return uint256(priceWithoutPrecision);
+    }
+
+    /////////////////////////////
+    ////////// GETTERS //////////
+    /////////////////////////////
+
+    /**
+     * @dev Returns the address of the collateral token contract.
+     */
+    function getCollateralTokenAddress() external view returns (address) {
+        return address(i_collateralToken);
+    }
+
+    /**
+     * @dev Returns the USD-equivalent balance of the user.
+     */
+    function getDollarsAmount(address _user) external view returns (uint256) {
+        return s_dollars[_user];
+    }
+
+    /**
+     * @dev Returns the address of the price feed contract.
+     */
+    function getPriceFeedAddress() external view returns (address) {
+        return address(i_priceFeed);
+    }
+
+    /**
+     * @dev Returns the USD value of 1 collateral token based on the current oracle price.
+     */
+    function getTokenValue() external view returns (uint256) {
+        return _getValueInUsd(1);
+    }
+
+    /**
+     * @dev Returns the raw price of the collateral token from the oracle without precision adjustments.
+     */
+    function getFullTokenValue() external view returns (uint256) {
+        return _getLastPriceOfCollateralTokenWithoutPrecision();
     }
 }

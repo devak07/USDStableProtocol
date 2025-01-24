@@ -8,5 +8,9 @@ remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts",
 ]
 
+[invariant]
+runs = 50
+depth = 64
+fail_on_revert = true
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

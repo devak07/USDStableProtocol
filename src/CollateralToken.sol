@@ -108,6 +108,14 @@ contract CollateralToken is ERC20Burnable, Ownable, Pausable {
         emit TokensMinted(_to, _amountToMint);
     }
 
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
     ////////////////////////////
     ///// VIEW FUNCTIONS ///////
     ////////////////////////////

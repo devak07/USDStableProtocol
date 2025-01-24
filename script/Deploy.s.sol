@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Script} from "forge-std/Script.sol";
 import {StabilityEngine} from "src/StabilityEngine.sol";
+import {Config} from "script/Config.s.sol";
 
 /**
  * @title Deploy Contract
@@ -14,16 +15,18 @@ import {StabilityEngine} from "src/StabilityEngine.sol";
 contract Deploy is Script {
     /**
      * @dev Deploys a new instance of the StabilityEngine contract.
-     * The deployment is handled in the setup function and is broadcasted to the Ethereum network.
+     * The deployment is handled in the run function and is broadcasted to the Ethereum network.
      *
      * @return stabilityEngine The deployed instance of the StabilityEngine contract.
      */
-    function setUp() external returns (StabilityEngine) {
+    function run() external returns (StabilityEngine) {
+        Config config = new Config();
+        address priceFeedAddress = config.run();
         // Start broadcasting transactions to the network
         vm.startBroadcast();
 
         // Create and deploy a new instance of the StabilityEngine contract
-        StabilityEngine stabilityEngine = new StabilityEngine();
+        StabilityEngine stabilityEngine = new StabilityEngine(priceFeedAddress);
 
         // Stop broadcasting transactions after the deployment
         vm.stopBroadcast();
