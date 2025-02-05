@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.19;
 
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
+ * @author Andrzej Knapik (GitHub: devak07)
  * @title MockV3AggregatorOwnable
  * @dev This contract is a mock implementation of the Chainlink AggregatorV3Interface.
  * It is designed to simulate the behavior of a Chainlink price feed for testing purposes.

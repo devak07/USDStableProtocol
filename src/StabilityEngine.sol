@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
-pragma solidity 0.8.20;
+pragma solidity ^0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -7,11 +7,9 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {CollateralToken} from "src/CollateralToken.sol";
 
-import {console} from "forge-std/Test.sol";
-
 /**
  * @title StabilityEngine
- * @author Andrzej Knapik (devak07)
+ * @author Andrzej Knapik (GitHub: devak07)
  *
  * @dev This contract is designed to manage a collateralized system where users can deposit collateral,
  *      and the system ensures that their deposits retain a stable value, even if the price of the collateral
@@ -28,8 +26,7 @@ import {console} from "forge-std/Test.sol";
  *         A future update will introduce fees or commissions to address this issue in case it arises, though it remains
  *         a rare and improbable occurrence.
  *
- * @notice System currently has a limitation where it will not function properly if the price of the collateral
- *         token falls below $10. This issue will be addressed in a future refactor.
+ * @notice System can only work if price of token is greater than 0.00000001$
  *
  * @notice System can't mint fractional tokens, so users can't redeem less than 1 token and can receive less than they
  *         deposited up to the value of 1 token.
@@ -164,7 +161,6 @@ contract StabilityEngine is ReentrancyGuard {
      */
     function _mintAndTransferCollateralToken(uint256 _valueInDollars) internal {
         if (s_dollars[msg.sender] < _valueInDollars) {
-            console.log("User balance: ", s_dollars[msg.sender]);
             revert StabilityEngine__InfufficientBalance();
         }
         uint256 amountToMint = _getAmountOfTokens(_valueInDollars);
@@ -210,8 +206,6 @@ contract StabilityEngine is ReentrancyGuard {
      */
     function _changeValueInUsd(address _user, bool _action, uint256 _amountOfCollateralTokens) internal {
         uint256 _amountInUsd = _getValueInUsd(_amountOfCollateralTokens);
-        console.log("USD Amount ", _amountInUsd);
-        console.log(s_dollars[_user]);
 
         if (_action) {
             s_dollars[_user] += _amountInUsd;
@@ -268,7 +262,7 @@ contract StabilityEngine is ReentrancyGuard {
     /**
      * @dev Returns the USD-equivalent balance of the user.
      */
-    function getDollarsAmount(address _user) external view returns (uint256) {
+    function getDollarsAmount(address _user) public view returns (uint256) {
         return s_dollars[_user];
     }
 

@@ -1,32 +1,42 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {Deploy} from "script/Deploy.s.sol";
 import {CollateralToken} from "src/CollateralToken.sol";
 import {StabilityEngine} from "src/StabilityEngine.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {MockV3AggregatorOwnable} from "test/mocks/MockV3AggregatorOwnable.sol";
 import {Vm} from "forge-std/Vm.sol";
+import {TestnetPriceRandomUpdate} from "src/TestnetPriceRandomUpdate.sol";
 
 /**
+ * @author Andrzej Knapik (GitHub: devak07)
  * @title StabilityEngineTest
  * @dev This contract contains unit tests for the `StabilityEngine` contract.
  * It tests the various deposit and redemption functionalities, ensuring that proper error handling occurs in edge cases,
  * such as insufficient balance or zero amounts, and that the contract behaves as expected in typical scenarios.
  */
 contract StabilityEngineTest is Test {
+    ///////////////////////////////
+    /////////// ERRORS ////////////
+    ///////////////////////////////
+
     error StabilityEngine__InvalidAddress();
     error StabilityEngine__MustBeMoreThanZero();
     error StabilityEngine__TransferFailed();
     error StabilityEngine__InvalidPrice();
     error StabilityEngine__InfufficientBalance();
-
     error ERC20InsufficientAllowance(address sender, uint256 balance, uint256 needed);
+
+    ///////////////////////////////
+    ////// STATE VARIABLES ////////
+    ///////////////////////////////
 
     // Instances of the contracts
     StabilityEngine stabilityEngine;
     CollateralToken collateralToken;
+    TestnetPriceRandomUpdate testnetPriceRandomUpdate;
 
     // Addresses and constants
     address owner;
@@ -35,17 +45,15 @@ contract StabilityEngineTest is Test {
     address private constant FOUNDRY_DEFAULT_ACCOUNT = 0x104fBc016F4bb334D775a19E8A6510109AC63E00;
     uint256 private constant STARTING_TOKEN_AMOUNT = 100;
     uint256 private constant SENDING_TOKEN_AMOUNT = 10;
+    uint256 private constant NEW_PRICE = 1e6;
+
+    uint256 private PRECISION = 1e8;
 
     address USER_1 = makeAddr("USER_1");
 
-    /**
-     * @dev Modifier for logging test messages.
-     * @param _msg The message to log before executing the function.
-     */
-    modifier msgTest(string memory _msg) {
-        console.log(_msg);
-        _;
-    }
+    ///////////////////////////////
+    ////////// MODIFIERS //////////
+    ///////////////////////////////
 
     /**
      * @dev Modifier for approving tokens for a user.
@@ -69,7 +77,8 @@ contract StabilityEngineTest is Test {
      * @dev Modifier for asserting the user's dollar amount after operations.
      */
     modifier assertionUsd() {
-        assertEq(stabilityEngine.getDollarsAmount(USER_1), 100);
+        uint256 usdValue = SENDING_TOKEN_AMOUNT * stabilityEngine.getFullTokenValue();
+        assertEq(stabilityEngine.getDollarsAmount(USER_1) * PRECISION, usdValue);
         _;
     }
 
@@ -78,16 +87,20 @@ contract StabilityEngineTest is Test {
      * Sets the collateral value based on the current price feed and amount of collateral.
      */
     modifier setCollateralValue() {
-        collateralValue = stabilityEngine.getTokenValue() * SENDING_TOKEN_AMOUNT;
+        collateralValue = stabilityEngine.getFullTokenValue() * SENDING_TOKEN_AMOUNT / PRECISION;
         _;
     }
+
+    ///////////////////////////////
+    //////// SETUP FUNCTION ///////
+    ///////////////////////////////
 
     /**
      * @dev Setup function to deploy the required contracts before each test.
      */
     function setUp() external {
         Deploy deploy = new Deploy();
-        stabilityEngine = deploy.run();
+        (stabilityEngine,, testnetPriceRandomUpdate) = deploy.run();
         collateralToken = CollateralToken(stabilityEngine.getCollateralTokenAddress());
         owner = address(stabilityEngine);
         priceFeed = stabilityEngine.getPriceFeedAddress();
@@ -96,11 +109,15 @@ contract StabilityEngineTest is Test {
         collateralToken.mint(USER_1, STARTING_TOKEN_AMOUNT);
     }
 
+    ///////////////////////////////
+    /////// TEST FUNCTIONS ////////
+    ///////////////////////////////
+
     /**
      * @dev Test: Deposit collateral with zero amount.
      * It expects a revert with `StabilityEngine__MustBeMoreThanZero` error.
      */
-    function testDepositCollateralWithZeroAmount() external msgTest("Testing deposit collateral with zero amount") {
+    function testDepositCollateralWithZeroAmount() external {
         vm.expectRevert(StabilityEngine__MustBeMoreThanZero.selector);
         stabilityEngine.depositCollateral(0);
     }
@@ -109,10 +126,7 @@ contract StabilityEngineTest is Test {
      * @dev Test: Deposit collateral without enough tokens.
      * It expects a revert with `ERC20InsufficientAllowance` error.
      */
-    function testDepositCollateralWithoutEnoughTokens()
-        external
-        msgTest("Testing deposit collateral without enough tokens")
-    {
+    function testDepositCollateralWithoutEnoughTokens() external {
         vm.expectRevert(abi.encodeWithSelector(ERC20InsufficientAllowance.selector, owner, 0, 1));
         stabilityEngine.depositCollateral(1);
     }
@@ -121,12 +135,7 @@ contract StabilityEngineTest is Test {
      * @dev Test: Deposit collateral with enough tokens.
      * It ensures the deposit happens correctly, triggers the correct event, and updates balances accordingly.
      */
-    function testDepositCollateralWithEnoughTokens()
-        external
-        msgTest("Testing deposit collateral with enough tokens")
-        tokensApprovedForUser
-        setCollateralValue
-    {
+    function testDepositCollateralWithEnoughTokens() external tokensApprovedForUser setCollateralValue {
         vm.recordLogs();
         stabilityEngine.depositCollateral(SENDING_TOKEN_AMOUNT);
 
@@ -142,7 +151,7 @@ contract StabilityEngineTest is Test {
      * @dev Test: Redeem collateral with zero amount.
      * It expects a revert with `StabilityEngine__MustBeMoreThanZero` error.
      */
-    function testRedeemCollateralWithZeroAmount() external msgTest("Testing redeem collateral with zero amount") {
+    function testRedeemCollateralWithZeroAmount() external {
         vm.expectRevert(StabilityEngine__MustBeMoreThanZero.selector);
         stabilityEngine.redeemCollateral(0);
     }
@@ -151,10 +160,7 @@ contract StabilityEngineTest is Test {
      * @dev Test: Redeem collateral without any collateral deposited.
      * It expects a revert with `StabilityEngine__InfufficientBalance` error.
      */
-    function testRedeemCollateralWithoutCollateralDeposited()
-        external
-        msgTest("Testing redeem collateral without collateral deposited")
-    {
+    function testRedeemCollateralWithoutCollateralDeposited() external {
         vm.expectRevert(StabilityEngine__InfufficientBalance.selector);
         stabilityEngine.redeemCollateral(1);
     }
@@ -165,7 +171,6 @@ contract StabilityEngineTest is Test {
      */
     function testRedeemCollateralWithTooMuchCollateral()
         external
-        msgTest("Testing redeem collateral with too much collateral")
         tokensApprovedForUser
         collateralDeposited
         setCollateralValue
@@ -180,7 +185,6 @@ contract StabilityEngineTest is Test {
      */
     function testRedeemCollateralWithDepositEnoughCollateral()
         external
-        msgTest("Testing redeem collateral with deposit enough collateral")
         tokensApprovedForUser
         collateralDeposited
         assertionUsd
@@ -202,22 +206,24 @@ contract StabilityEngineTest is Test {
      */
     function testFullFunctionality()
         external
-        msgTest("Testing full functionality")
         tokensApprovedForUser
         collateralDeposited
         assertionUsd
         setCollateralValue
     {
         vm.stopPrank();
-
-        vm.prank(FOUNDRY_DEFAULT_ACCOUNT);
-        MockV3AggregatorOwnable(priceFeed).updateAnswer(1e8);
+        uint256 startingTokens = collateralToken.balanceOf(USER_1);
+        vm.prank(MockV3AggregatorOwnable(priceFeed).owner());
+        MockV3AggregatorOwnable(priceFeed).updateAnswer(int256(NEW_PRICE));
 
         vm.prank(USER_1);
         stabilityEngine.redeemCollateral(collateralValue);
 
         assertEq(stabilityEngine.getDollarsAmount(USER_1), 0);
-        assertEq(190, collateralToken.balanceOf(USER_1));
-        assertEq(stabilityEngine.getTokenValue(), 1);
+        assertEq(
+            collateralValue,
+            (collateralToken.balanceOf(USER_1) - startingTokens) * stabilityEngine.getFullTokenValue() / PRECISION
+        );
+        assertEq(stabilityEngine.getFullTokenValue(), NEW_PRICE);
     }
 }

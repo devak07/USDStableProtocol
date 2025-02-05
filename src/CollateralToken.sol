@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import {ERC20Burnable, ERC20} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -7,7 +7,7 @@ import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
  * @title CollateralToken
- * @author Andrzej Knapik (devak07)
+ * @author Andrzej Knapik (GitHub: devak07)
  *
  * @dev This contract implements a token that acts as collateral within a
  *      collateral-based financial system. It allows for minting, burning, and
@@ -19,7 +19,7 @@ import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
  *         not undergone any formal security audits. It is not recommended
  *         for use in a production environment.
  */
-contract CollateralToken is ERC20Burnable, Ownable, Pausable {
+contract CollateralToken is ERC20Burnable, Ownable {
     ////////////////////////////
     ///////// ERRORS ///////////
     ////////////////////////////
@@ -85,7 +85,7 @@ contract CollateralToken is ERC20Burnable, Ownable, Pausable {
      *         within the system.
      * @param _amountToBurn The amount of tokens to burn.
      */
-    function burn(uint256 _amountToBurn) public override onlyOwner whenNotPaused moreThanZero(_amountToBurn) {
+    function burn(uint256 _amountToBurn) public override onlyOwner moreThanZero(_amountToBurn) {
         super.burn(_amountToBurn);
         emit TokensBurned(_amountToBurn);
     }
@@ -100,20 +100,11 @@ contract CollateralToken is ERC20Burnable, Ownable, Pausable {
     function mint(address _to, uint256 _amountToMint)
         public
         onlyOwner
-        whenNotPaused
         moreThanZero(_amountToMint)
         isValidAddress(_to)
     {
         _mint(_to, _amountToMint);
         emit TokensMinted(_to, _amountToMint);
-    }
-
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    function unpause() external onlyOwner {
-        _unpause();
     }
 
     ////////////////////////////

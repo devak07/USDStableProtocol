@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {FailOnRevertHandler} from "test/fuzz/failOnRevert/FailOnRevertHandler.t.sol";
 import {Deploy} from "script/Deploy.s.sol";
@@ -11,59 +11,60 @@ import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 /**
  * @title FailOnRevertInvariants
- * @dev This contract is used for running invariant tests on the StabilityEngine and FailOnRevertHandler.
- * It checks that the StabilityEngine doesn't hold collateral tokens and that the getters in StabilityEngine don't revert.
+ * @author Andrzej Knapik (GitHub: devak07)
+ * @notice This contract is designed to perform invariant tests on the StabilityEngine contract to ensure that:
+ *         - The StabilityEngine never holds collateral tokens.
+ *         - Getter functions in the StabilityEngine contract do not revert.
+ * @dev It uses Foundry's `StdInvariant` for property-based testing.
  */
 contract FailOnRevertInvariants is StdInvariant, Test {
-    // Instances of the required contracts for testing
-    FailOnRevertHandler handler;
-    StabilityEngine stabilityEngine;
-    CollateralToken collateralToken;
+    /////////////////////////////
+    ////// STATE VARIABLES //////
+    /////////////////////////////
+
+    FailOnRevertHandler handler; // Instance of the handler contract for executing actions
+    StabilityEngine stabilityEngine; // Instance of the StabilityEngine contract
+    CollateralToken collateralToken; // Instance of the CollateralToken contract
+
+    /////////////////////////////
+    //////// FUNCTIONS //////////
+    /////////////////////////////
 
     /**
-     * @dev Set up the environment for the tests. Deploys the contracts and sets up the target contract.
+     * @dev Sets up the testing environment by deploying contracts and setting up the invariant test target.
+     * @notice Deploys the StabilityEngine and CollateralToken contracts, then initializes the FailOnRevertHandler.
      */
     function setUp() external {
-        // Deploy the contracts
+        // Deploy the contracts using the Deploy script
         Deploy deploy = new Deploy();
-        stabilityEngine = deploy.run();
+        (stabilityEngine,,) = deploy.run();
+
+        // Get the deployed CollateralToken instance from StabilityEngine
         collateralToken = CollateralToken(stabilityEngine.getCollateralTokenAddress());
+
+        // Create an instance of the FailOnRevertHandler
         handler = new FailOnRevertHandler(stabilityEngine, collateralToken);
 
-        // Set the target contract for invariants
+        // Set the handler contract as the target for invariant testing
         targetContract(address(handler));
     }
 
     /**
-     * @dev Invariant test to ensure that the StabilityEngine never holds any collateral tokens.
-     * @notice This ensures that collateral tokens are always in the hands of users, not the StabilityEngine.
+     * @dev Invariant test to ensure the StabilityEngine contract never holds collateral tokens.
+     * @notice This guarantees that all collateral tokens remain with users and are not stored in the StabilityEngine.
      */
     function invariant__stabilityEngineCantHaveCollateralTokens() public view {
-        // Assert that the StabilityEngine has no collateral tokens
+        // Assert that the StabilityEngine's balance of collateral tokens is always zero
         assertEq(IERC20(address(collateralToken)).balanceOf(address(stabilityEngine)), 0);
-
-        // Log the internal counters from the FailOnRevertHandler for monitoring
-        console.log(
-            handler.redeemCollateralCounter(),
-            handler.mintAndDepositCollateralCounter(),
-            handler.updatePriceFeedCounter()
-        );
     }
 
     /**
-     * @dev Invariant test to ensure that the getter functions in the StabilityEngine contract do not revert.
-     * @notice This checks that the StabilityEngine contract's getter functions work correctly and do not revert.
+     * @dev Invariant test to ensure that the StabilityEngine's getter functions do not revert.
+     * @notice This verifies that getter functions always return valid values and do not throw errors.
      */
     function invariant__gettersCantRevert() public view {
-        // Ensure getter functions don't revert by calling them
+        // Ensure that calling getter functions does not revert
         stabilityEngine.getCollateralTokenAddress();
         stabilityEngine.getPriceFeedAddress();
-
-        // Log the internal counters from the FailOnRevertHandler for monitoring
-        console.log(
-            handler.redeemCollateralCounter(),
-            handler.mintAndDepositCollateralCounter(),
-            handler.updatePriceFeedCounter()
-        );
     }
 }
