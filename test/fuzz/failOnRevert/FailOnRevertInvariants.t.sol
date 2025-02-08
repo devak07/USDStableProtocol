@@ -37,7 +37,7 @@ contract FailOnRevertInvariants is StdInvariant, Test {
     function setUp() external {
         // Deploy the contracts using the Deploy script
         Deploy deploy = new Deploy();
-        (stabilityEngine,,) = deploy.run();
+        stabilityEngine = deploy.run();
 
         // Get the deployed CollateralToken instance from StabilityEngine
         collateralToken = CollateralToken(stabilityEngine.getCollateralTokenAddress());

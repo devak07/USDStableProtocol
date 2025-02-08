@@ -43,7 +43,7 @@ contract FailOnRevertOneToOneInvariant is StdInvariant, Test {
     function setUp() external {
         // Deploy StabilityEngine and its associated contracts.
         Deploy deploy = new Deploy();
-        (stabilityEngine,,) = deploy.run();
+        stabilityEngine = deploy.run();
         collateralToken = CollateralToken(stabilityEngine.getCollateralTokenAddress());
 
         // Initialize the handler to facilitate testing operations.

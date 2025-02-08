@@ -68,7 +68,7 @@ contract CollateralTokenTest is Test {
      */
     function setUp() external {
         Deploy deploy = new Deploy();
-        (stabilityEngine,,) = deploy.run();
+        stabilityEngine = deploy.run();
         collateralToken = CollateralToken(stabilityEngine.getCollateralTokenAddress());
         owner = address(stabilityEngine);
     }

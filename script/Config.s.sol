@@ -2,8 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {Script} from "forge-std/Script.sol";
-import {MockV3AggregatorOwnable} from "test/mocks/MockV3AggregatorOwnable.sol";
-import {TestnetPriceRandomUpdate} from "src/TestnetPriceRandomUpdate.sol";
+import {MockV3AggregatorAltered} from "test/mocks/MockV3AggregatorAltered.sol";
 import {VRFCoordinatorV2_5Mock} from "@chainlink/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
 
 /**
@@ -14,8 +13,6 @@ import {VRFCoordinatorV2_5Mock} from "@chainlink/contracts/src/v0.8/vrf/mocks/VR
 contract CONFIGURATION_STRUCT {
     struct Configuration {
         address priceFeed;
-        address vrfCoordinator;
-        uint256 subscriptionId;
     }
 }
 
@@ -63,18 +60,18 @@ contract Config is Script, CONFIGURATION_STRUCT, NETWORK_IDS {
      * @return A Configuration struct with placeholder addresses set to `address(0)`.
      */
     function getEthMainnetConfiguration() private pure returns (Configuration memory) {
-        return Configuration(address(0), address(0), 0);
+        return Configuration(address(0));
     }
 
     /**
      * @notice Deploys a mock price feed for the Amoy testnet.
-     * @dev This function deploys a `MockV3AggregatorOwnable` contract with a predefined starting price.
+     * @dev This function deploys a `MockV3AggregatorAltered` contract with a predefined starting price.
      *      Chainlink VRF subscriptions must be manually created when deploying to Amoy.
      * @return A Configuration struct containing the deployed mock price feed address.
      */
     function getAmoyTestnetConfiguration() private returns (Configuration memory) {
-        MockV3AggregatorOwnable mockV3Aggregator = new MockV3AggregatorOwnable(DECIMALS, STARTING_PRICE);
-        return Configuration(address(mockV3Aggregator), address(0), 0);
+        MockV3AggregatorAltered mockV3Aggregator = new MockV3AggregatorAltered(DECIMALS, STARTING_PRICE);
+        return Configuration(address(mockV3Aggregator));
     }
 
     /**
@@ -85,12 +82,10 @@ contract Config is Script, CONFIGURATION_STRUCT, NETWORK_IDS {
     function getAnvilLocalConfiguration() private returns (Configuration memory) {
         vm.startBroadcast();
 
-        VRFCoordinatorV2_5Mock vrfCoordinator = new VRFCoordinatorV2_5Mock(BASE_FEE, GAS_PRICE, WEI_PER_UNIT_LINK);
-        uint256 subscriptionId = vrfCoordinator.createSubscription();
-        vrfCoordinator.fundSubscription(subscriptionId, FUNDING_AMOUNT);
+        MockV3AggregatorAltered mockV3Aggregator = new MockV3AggregatorAltered(DECIMALS, STARTING_PRICE);
 
         vm.stopBroadcast();
 
-        return Configuration(address(0), address(vrfCoordinator), subscriptionId);
+        return Configuration(address(mockV3Aggregator));
     }
 }

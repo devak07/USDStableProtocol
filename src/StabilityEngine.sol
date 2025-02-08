@@ -286,4 +286,17 @@ contract StabilityEngine is ReentrancyGuard {
     function getFullTokenValue() external view returns (uint256) {
         return _getLastPriceOfCollateralTokenWithoutPrecision();
     }
+
+    ///////////////////////////////////////////////////////////////////////////////////
+    /////////// THIS FUNCTION IS ONLY FOR TESTING AND PROJECT PRESENTATION ////////////
+    // IF YOU LEAVE THIS FUNCTION AVAILABLE IN PRODUCTION, YOU WILL LOOSE YOUR MONEY //
+    ///////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * @dev This function is used to present token on testnet or local chain.
+     * It gives ten collateral tokens to user that calls this function to use it later in this protocol.
+     */
+    function getTenTokens() external {
+        i_collateralToken.mint(msg.sender, 10);
+    }
 }

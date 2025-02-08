@@ -6,9 +6,8 @@ import {Deploy} from "script/Deploy.s.sol";
 import {CollateralToken} from "src/CollateralToken.sol";
 import {StabilityEngine} from "src/StabilityEngine.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {MockV3AggregatorOwnable} from "test/mocks/MockV3AggregatorOwnable.sol";
+import {MockV3AggregatorAltered} from "test/mocks/MockV3AggregatorAltered.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {TestnetPriceRandomUpdate} from "src/TestnetPriceRandomUpdate.sol";
 
 /**
  * @author Andrzej Knapik (GitHub: devak07)
@@ -36,7 +35,6 @@ contract StabilityEngineTest is Test {
     // Instances of the contracts
     StabilityEngine stabilityEngine;
     CollateralToken collateralToken;
-    TestnetPriceRandomUpdate testnetPriceRandomUpdate;
 
     // Addresses and constants
     address owner;
@@ -100,7 +98,7 @@ contract StabilityEngineTest is Test {
      */
     function setUp() external {
         Deploy deploy = new Deploy();
-        (stabilityEngine,, testnetPriceRandomUpdate) = deploy.run();
+        (stabilityEngine) = deploy.run();
         collateralToken = CollateralToken(stabilityEngine.getCollateralTokenAddress());
         owner = address(stabilityEngine);
         priceFeed = stabilityEngine.getPriceFeedAddress();
@@ -200,6 +198,13 @@ contract StabilityEngineTest is Test {
         assertEq(STARTING_TOKEN_AMOUNT, collateralToken.balanceOf(USER_1));
     }
 
+    function testGetTenTokens() external {
+        vm.startPrank(USER_1);
+        stabilityEngine.getTenTokens();
+
+        assertEq(collateralToken.balanceOf(USER_1), STARTING_TOKEN_AMOUNT + 10);
+    }
+
     /**
      * @dev Test: Full functionality of the `StabilityEngine`.
      * It tests the entire flow of depositing collateral, updating the price feed, and redeeming collateral, ensuring everything works together.
@@ -213,8 +218,7 @@ contract StabilityEngineTest is Test {
     {
         vm.stopPrank();
         uint256 startingTokens = collateralToken.balanceOf(USER_1);
-        vm.prank(MockV3AggregatorOwnable(priceFeed).owner());
-        MockV3AggregatorOwnable(priceFeed).updateAnswer(int256(NEW_PRICE));
+        MockV3AggregatorAltered(priceFeed).updateAnswer(int256(NEW_PRICE));
 
         vm.prank(USER_1);
         stabilityEngine.redeemCollateral(collateralValue);

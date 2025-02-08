@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {Deploy} from "script/Deploy.s.sol";
 import {StabilityEngine} from "src/StabilityEngine.sol";
 import {CollateralToken} from "src/CollateralToken.sol";
-import {MockV3AggregatorOwnable} from "test/mocks/MockV3AggregatorOwnable.sol";
+import {MockV3AggregatorAltered} from "test/mocks/MockV3AggregatorAltered.sol";
 
 /**
  * @title FailOnRevertHandler
@@ -120,16 +120,7 @@ contract FailOnRevertHandler is Test {
         uint256 valueToSet = bound(_value, 1, MAX_UINT16); // Ensures the price value is reasonable
 
         // Get the price feed aggregator contract
-        MockV3AggregatorOwnable aggregator = MockV3AggregatorOwnable(address(stabilityEngine.getPriceFeedAddress()));
-
-        // Ensure StabilityEngine owns the price feed, transfer ownership if necessary
-        if (aggregator.owner() != address(stabilityEngine)) {
-            vm.prank(aggregator.owner());
-            aggregator.transferOwnership(address(stabilityEngine));
-        }
-
-        // Update the price feed
-        vm.prank(address(stabilityEngine));
+        MockV3AggregatorAltered aggregator = MockV3AggregatorAltered(address(stabilityEngine.getPriceFeedAddress()));
         aggregator.updateAnswer(int256(valueToSet));
 
         // Increment the counter for tracking

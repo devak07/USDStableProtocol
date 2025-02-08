@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {Deploy} from "script/Deploy.s.sol";
 import {StabilityEngine} from "src/StabilityEngine.sol";
 import {CollateralToken} from "src/CollateralToken.sol";
-import {MockV3AggregatorOwnable} from "test/mocks/MockV3AggregatorOwnable.sol";
+import {MockV3AggregatorAltered} from "test/mocks/MockV3AggregatorAltered.sol";
 
 /**
  * @title FailOnRevertOneToOneHandler
@@ -40,7 +40,7 @@ contract FailOnRevertOneToOneHandler is Test {
     uint256 constant MAX_COLLATERAL = type(uint16).max;
 
     /// @notice Maximum value for an 8-bit integer.
-    uint256 constant MAX_UINT8 = type(uint8).max;
+    uint256 constant MAX_UINT16 = type(uint16).max;
 
     /// @notice References to the StabilityEngine and CollateralToken contracts.
     StabilityEngine stabilityEngine;
@@ -94,21 +94,13 @@ contract FailOnRevertOneToOneHandler is Test {
 
     /**
      * @dev Updates the price feed of the collateral token.
-     *      The price is bounded between 0.00000001 and MAX_UINT8.
+     *      The price is bounded between 0.00000001 and MAX_UINT16.
      * @param _value The new value to set in the price feed.
      */
     function updatePriceFeed(uint256 _value) public {
-        uint256 valueToSet = bound(_value, 1, MAX_UINT8 * 1e8);
-        MockV3AggregatorOwnable aggregator = MockV3AggregatorOwnable(address(stabilityEngine.getPriceFeedAddress()));
+        uint256 valueToSet = bound(_value, 1, MAX_UINT16);
+        MockV3AggregatorAltered aggregator = MockV3AggregatorAltered(address(stabilityEngine.getPriceFeedAddress()));
 
-        // Transfer ownership of the aggregator to StabilityEngine if needed
-        if (aggregator.owner() != address(stabilityEngine)) {
-            vm.prank(aggregator.owner());
-            aggregator.transferOwnership(address(stabilityEngine));
-        }
-
-        // Update the price feed
-        vm.prank(address(stabilityEngine));
         aggregator.updateAnswer(int256(valueToSet));
 
         updatePriceFeedCounter++;

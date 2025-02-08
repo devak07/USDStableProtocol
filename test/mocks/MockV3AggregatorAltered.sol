@@ -2,11 +2,8 @@
 pragma solidity ^0.8.19;
 
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
- * @author Andrzej Knapik (GitHub: devak07)
- * @title MockV3AggregatorOwnable
  * @dev This contract is a mock implementation of the Chainlink AggregatorV3Interface.
  * It is designed to simulate the behavior of a Chainlink price feed for testing purposes.
  *
@@ -20,7 +17,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  * as it does not provide live price data. Contracts deployed on the mainnet or testnet require
  * a live Chainlink node for accurate price updates.
  */
-contract MockV3AggregatorOwnable is AggregatorV3Interface, Ownable {
+contract MockV3AggregatorAltered is AggregatorV3Interface {
     uint256 public constant version = 4; // Version of the mock implementation.
 
     uint8 public decimals; // Number of decimals for the price data.
@@ -37,7 +34,7 @@ contract MockV3AggregatorOwnable is AggregatorV3Interface, Ownable {
      * @param _decimals Number of decimals for the price data.
      * @param _initialAnswer Initial price answer to set.
      */
-    constructor(uint8 _decimals, int256 _initialAnswer) Ownable(msg.sender) {
+    constructor(uint8 _decimals, int256 _initialAnswer) {
         decimals = _decimals;
         updateAnswer(_initialAnswer);
     }
@@ -47,7 +44,10 @@ contract MockV3AggregatorOwnable is AggregatorV3Interface, Ownable {
      * @dev This function is restricted to the contract owner.
      * @param _answer The new price answer to set.
      */
-    function updateAnswer(int256 _answer) public onlyOwner {
+    function updateAnswer(int256 _answer) public {
+        if (_answer < 1 || _answer > type(int32).max) {
+            revert("Price cannot be lower than 1e-8 and shouldn't be greater than max int32 number");
+        }
         latestAnswer = _answer;
         latestTimestamp = block.timestamp;
         latestRound++;
@@ -64,10 +64,10 @@ contract MockV3AggregatorOwnable is AggregatorV3Interface, Ownable {
      * @param _timestamp The timestamp for the round.
      * @param _startedAt The start time for the round.
      */
-    function updateRoundData(uint80 _roundId, int256 _answer, uint256 _timestamp, uint256 _startedAt)
-        public
-        onlyOwner
-    {
+    function updateRoundData(uint80 _roundId, int256 _answer, uint256 _timestamp, uint256 _startedAt) public {
+        if (_answer < 1 || _answer > type(int32).max) {
+            revert("Price cannot be lower than 1e-8 and shouldn't be greater than max int32 number");
+        }
         latestRound = _roundId;
         latestAnswer = _answer;
         latestTimestamp = _timestamp;
