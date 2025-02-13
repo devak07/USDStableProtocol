@@ -59,6 +59,11 @@ In the **StabilityEngine** contract, there is a function designed for test envir
 
 ## Testing  
 
+### Fork URL Tests  
+
+Tests that use Fork URLs are initially commented out to ensure GitHub tests pass.  
+After selecting your RPC URLs, you can uncomment these tests to enable them.  
+
 ### Running Tests Locally (Anvil)  
 
 1. Start an Anvil local node.  
@@ -94,6 +99,7 @@ This command will interact with the deployed contract to retrieve the 10 tokens 
 ✅ All smart contracts have been **fully tested** however, those branches that are not tested, are simple Invariant Reverts (**failOnRevert is set to true**).  
 ![Alt text](img/coverage.png)  
 ⚠️ **Note:** The system **cannot be deployed on the mainnet**. It only works on local Anvil nodes and official testnets due to limitations with the Chainlink price feeds.  
+
 
 Additionally, while the **contract** can be tested locally or on testnets, **there will be an update** to enable contract testing directly on the [project website](#) in the future. Until that is up and running, you can continue testing manually by deploying to a local node or testnet.
 
