@@ -18,6 +18,8 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interf
  * a live Chainlink node for accurate price updates.
  */
 contract MockV3AggregatorAltered is AggregatorV3Interface {
+    error MockV3AggregatorAltered__WrongPriceData();
+
     uint256 public constant version = 4; // Version of the mock implementation.
 
     uint8 public decimals; // Number of decimals for the price data.
@@ -45,8 +47,8 @@ contract MockV3AggregatorAltered is AggregatorV3Interface {
      * @param _answer The new price answer to set.
      */
     function updateAnswer(int256 _answer) public {
-        if (_answer < 1 || _answer > type(int32).max) {
-            revert("Price cannot be lower than 1e-8 and shouldn't be greater than max int32 number");
+        if (_answer < 1 || _answer > type(int96).max) {
+            revert MockV3AggregatorAltered__WrongPriceData();
         }
         latestAnswer = _answer;
         latestTimestamp = block.timestamp;
@@ -65,8 +67,8 @@ contract MockV3AggregatorAltered is AggregatorV3Interface {
      * @param _startedAt The start time for the round.
      */
     function updateRoundData(uint80 _roundId, int256 _answer, uint256 _timestamp, uint256 _startedAt) public {
-        if (_answer < 1 || _answer > type(int32).max) {
-            revert("Price cannot be lower than 1e-8 and shouldn't be greater than max int32 number");
+        if (_answer < 1 || _answer > type(int96).max) {
+            revert MockV3AggregatorAltered__WrongPriceData();
         }
         latestRound = _roundId;
         latestAnswer = _answer;
@@ -120,6 +122,6 @@ contract MockV3AggregatorAltered is AggregatorV3Interface {
      * @return A string description of the mock.
      */
     function description() external pure returns (string memory) {
-        return "v0.6/test/mock/MockV3Aggregator.sol";
+        return "v0.6/test/mock/MockV3AggregatorAltered.sol";
     }
 }

@@ -6,6 +6,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {CollateralToken} from "src/CollateralToken.sol";
+import {ICollateralToken} from "src/interfaces/ICollateralToken.sol";
 
 /**
  * @title StabilityEngine
@@ -65,12 +66,12 @@ contract StabilityEngine is ReentrancyGuard {
     ////// STATE VARIABLES //////
     /////////////////////////////
 
+    ICollateralToken private immutable i_collateralToken; // Collateral token instance.
+
     uint256 private constant PRECISION_TO_ADD = 1e10; // Precision factor for price adjustments.
     uint256 private constant PRECISION = 1e18; // Base precision used throughout the system.
 
-    CollateralToken private immutable i_collateralToken; // Collateral token instance.
-
-    mapping(address userAddress => uint256 dollarsAmount) s_dollars; // Mapping to track each user's USD-equivalent collateral amount.
+    mapping(address userAddress => uint256 dollarsAmount) private s_dollars; // Mapping to track each user's USD-equivalent collateral amount.
     AggregatorV3Interface private immutable i_priceFeed;
 
     /////////////////////////////
@@ -116,7 +117,8 @@ contract StabilityEngine is ReentrancyGuard {
      * @param _priceFeed The address of the Chainlink price feed contract for the collateral token.
      */
     constructor(address _priceFeed) {
-        i_collateralToken = new CollateralToken(); // Deploys a new instance of the CollateralToken contract.
+        CollateralToken collateralToken = new CollateralToken(); // Deploys a new instance of the CollateralToken contract.
+        i_collateralToken = ICollateralToken(address(collateralToken));
         i_priceFeed = AggregatorV3Interface(_priceFeed);
     }
 

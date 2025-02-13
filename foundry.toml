@@ -11,8 +11,10 @@ fs_permissions = [
     { access = "read", path = "./broadcast" },
     { access = "read", path = "./reports" },
 ]
+
+rpc_endpoints = { rpc-ethmainnet = "<YOUR_RPC_URL>", rpc-amoy = "<YOUR_RPC_URL>", anvil-rpc = "127.0.0.1:8545" }
 [invariant]
-runs = 10
+runs = 100
 depth = 10
 fail_on_revert = true
 
