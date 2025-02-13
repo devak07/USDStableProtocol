@@ -91,7 +91,7 @@ forge script script/Interactions.s.sol:GetTenTokensAndDeposit --rpc-url <TESTNET
 This command will interact with the deployed contract to retrieve the 10 tokens and deposit them. Ensure you are running this script after the contract has been deployed to your local Anvil node or testnet.
 
 ## Testing & Security  
-✅ All smart contracts have been **fully tested**.  
+✅ All smart contracts have been **fully tested** however, those branches that are not tested, are simple Invariant Reverts (**failOnRevert is set to true**).  
 ![Alt text](img/coverage.png)  
 ⚠️ **Note:** The system **cannot be deployed on the mainnet**. It only works on local Anvil nodes and official testnets due to limitations with the Chainlink price feeds.  
 
